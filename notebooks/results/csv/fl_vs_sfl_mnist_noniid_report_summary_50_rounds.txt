@@ -1,0 +1,20 @@
+Experiment: FL vs SFL under MNIST non-IID label-skew settings.
+
+Dataset: MNIST.
+Clients: 10.
+Communication rounds: 50.
+Local epochs per client per round: 1.
+Optimizer: adam.
+Base learning rate: 0.001.
+Learning-rate decay enabled: False.
+
+The experiment compares 1, 2, 4, and 6 labels per client. The one-label-per-client case represents the most extreme non-IID setting and is expected to be the hardest for plain FedAvg. The global model is evaluated on the full MNIST test set after every aggregation round.
+
+Final-round results:
+- 1 labels/client: FL accuracy=0.0892, SFL accuracy=0.0892, L2 distance=0.000000.
+- 2 labels/client: FL accuracy=0.7649, SFL accuracy=0.7649, L2 distance=0.000000.
+- 4 labels/client: FL accuracy=0.9636, SFL accuracy=0.9636, L2 distance=0.000000.
+- 6 labels/client: FL accuracy=0.9782, SFL accuracy=0.9782, L2 distance=0.000000.
+
+Interpretation note:
+If FL and SFL remain very close, this supports the equivalence of the implemented SFL Design 1 and the FL baseline. If accuracy improves when moving from 1 label/client to 2, 4, and 6 labels/client, this demonstrates how increasing data diversity at each client reduces the difficulty caused by non-IID label skew.

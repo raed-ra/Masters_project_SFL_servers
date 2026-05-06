@@ -1,0 +1,5 @@
+labels_per_client,best_fl_round,best_fl_accuracy,best_sfl_round,best_sfl_accuracy,final_fl_accuracy,final_sfl_accuracy
+1,45,0.1334,45,0.1334,0.1144,0.1144
+2,44,0.4302,44,0.4302,0.4249,0.4249
+4,50,0.64,50,0.64,0.64,0.64
+6,50,0.5789,50,0.5789,0.5789,0.5789

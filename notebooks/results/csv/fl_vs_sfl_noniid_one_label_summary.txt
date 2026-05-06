@@ -1,0 +1,14 @@
+
+Experiment: FL vs SFL under extreme non-IID data distribution.
+
+Dataset: MNIST.
+Clients: 10.
+Non-IID setting: each client receives data from only one label/class.
+Communication rounds: 50.
+Local epochs per client per round: 1.
+
+The global model was evaluated after every aggregation round on the full MNIST test set.
+The final FL accuracy was 0.1135.
+The final SFL accuracy was 0.1135.
+
+The saved CSV file contains one row per communication round, giving 50 accuracy values for FL and 50 accuracy values for SFL.
