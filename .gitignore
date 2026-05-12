@@ -1,1 +1,13 @@
 data/
+results/
+weights/
+__pycache__/
+.ipynb_checkpoints/
+*.pt
+*.pth
+*.pkl
+*.csv
+*.png
+*.jpg
+*.tar.gz
+*.zip
