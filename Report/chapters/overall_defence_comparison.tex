@@ -1,0 +1,13 @@
+\section*{Overall Defence Comparison (Files 05G--05J)}
+
+The four defence experiments demonstrated important differences between statistical and directional anomaly detection methods under extreme non-IID Split Federated Learning conditions.
+
+Among all tested approaches, the Median/MAD defence in File 05G produced the most stable and reliable overall behaviour. Both FL and SFL maintained stable convergence under the SGA poisoning attack, and the method remained robust despite the small number of clients and highly heterogeneous data distribution.
+
+The historical cosine defence in File 05H showed the weakest performance. Although the cosine-based approach improved SFL robustness compared with the undefended attack scenario, it failed to prevent FL collapse. This occurred because extreme non-IID training naturally produces highly different update directions between honest clients, making cosine similarity less reliable as an anomaly signal.
+
+File 05I combined Median/MAD and historical cosine similarity into a multi-signal defence framework. This improved performance compared with cosine-only defence and maintained strong FL robustness. However, the combined method did not clearly outperform the standalone Median/MAD defence, suggesting that cosine similarity contributed limited additional value under the one-label-per-client setting.
+
+File 05J introduced a split-aware SFL defence using server-observable loss statistics rather than direct cosine filtering. Although its final accuracy remained similar to 05G, the experiment demonstrated an important conceptual contribution: SFL defence mechanisms can exploit server-visible behaviour without requiring access to the full client model or violating privacy assumptions.
+
+Overall, the experiments suggest that robust statistical filtering methods such as Median/MAD are more reliable than directional cosine-based methods under extreme non-IID conditions with small client counts. Furthermore, the results indicate that SFL-specific defence mechanisms should consider the split architecture and observable server-side behaviour rather than directly reusing traditional FL defence strategies.

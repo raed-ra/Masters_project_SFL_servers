@@ -1,0 +1,367 @@
+\subsection*{File 05J: SFL-Aware Median/MAD Defence using Server-Observable Loss}
+
+File 05J investigates a more architecture-aware defence mechanism for Split Federated Learning (SFL). After File 05I showed that combining Median/MAD and historical cosine could improve robustness compared with standalone cosine, File 05J moves in a different direction. Instead of adding more anomaly signals, this file focuses on where the defence should be applied in FL and SFL, given that the poisoning attack affects the two systems differently.
+
+The experiment continues using:
+\begin{itemize}
+    \item the MNIST dataset,
+    \item the extreme one-label-per-client non-IID setting,
+    \item the three-layer MLP architecture,
+    \item and the same SGA poisoning attack on client 0.
+\end{itemize}
+
+The model remains:
+
+\[
+784 \rightarrow 256 \rightarrow 128 \rightarrow 10
+\]
+
+with the SFL split:
+
+\[
+\text{Client side: } 784 \rightarrow 256
+\]
+
+\[
+\text{Server side: } 256 \rightarrow 128 \rightarrow 10
+\]
+
+\subsubsection*{Important Clarification: Does File 05J Use Cosine?}
+
+Although the notebook still contains a cosine helper function, the active defence logic in the main experiment does not use cosine for the SFL filtering decision. In the main training loop, the SFL defence is based on server-observable loss scores:
+
+\[
+\texttt{sfl\_defence\_mode = median\_loss\_observable}
+\]
+
+and the recorded cosine scores are set to:
+
+\[
+\texttt{sfl\_cosine\_scores = None}
+\]
+
+Therefore, File 05J should not be described as a cosine-combined defence. It is better described as:
+
+\begin{quote}
+an SFL-aware Median/MAD defence based on server-observable loss, combined with full-model Median/MAD update filtering for FL.
+\end{quote}
+
+This is different from File 05I, which genuinely combines Median/MAD and historical cosine similarity.
+
+\subsubsection*{Motivation for File 05J}
+
+The main motivation behind File 05J is that FL and SFL have different attack surfaces.
+
+In standard FL, the malicious client controls the full model update:
+
+\[
+\Delta \theta_{FL}
+\]
+
+which includes all layers of the network.
+
+In SFL, the malicious client only controls the client-side layer:
+
+\[
+\Delta \theta_c
+\]
+
+while the server-side model parameters:
+
+\[
+\theta_s
+\]
+
+are not directly controlled by the client.
+
+This means that applying the same defence logic to both FL and SFL may not be optimal. File 05J therefore implements defence logic that is adapted to the structure of each system.
+
+\subsubsection*{FL Defence in File 05J}
+
+For FL, the defence is applied to the full model update because the FL attacker can poison all layers.
+
+For each FL client, the update distance from the pre-round global model is calculated:
+
+\[
+s_k^{FL}
+=
+\left\|
+\theta_k^{t+1}
+-
+\theta^{t}
+\right\|_2
+\]
+
+where:
+\begin{itemize}
+    \item $\theta_k^{t+1}$ is the locally trained model of client $k$,
+    \item and $\theta^{t}$ is the global model before the round.
+\end{itemize}
+
+Median/MAD filtering is then applied to the update scores:
+
+\[
+m^{FL}
+=
+\mathrm{median}(s_1^{FL}, s_2^{FL}, \dots, s_K^{FL})
+\]
+
+\[
+MAD^{FL}
+=
+\mathrm{median}
+\left(
+|s_k^{FL} - m^{FL}|
+\right)
+\]
+
+A client is flagged if:
+
+\[
+s_k^{FL}
+>
+m^{FL}
++
+\lambda MAD^{FL}
+\]
+
+where $\lambda$ is the MAD multiplier.
+
+The FL aggregation then keeps only the non-flagged clients:
+
+\[
+\theta^{t+1}
+=
+\sum_{k \in \mathcal{K}_{keep}^{FL}}
+\frac{n_k}{n}
+\theta_k^{t+1}
+\]
+
+This is a full-model robust aggregation defence.
+
+\subsubsection*{SFL Defence in File 05J}
+
+The SFL defence is different because the server does not directly inspect client-side weights. Instead, it uses server-observable behaviour during split learning.
+
+In this file, the active SFL defence uses the per-client server-side loss:
+
+\[
+s_k^{SFL}
+=
+\overline{\ell}_k
+\]
+
+where $\overline{\ell}_k$ is the mean server-observed loss for client $k$ during that communication round.
+
+Median/MAD filtering is then applied to these loss scores:
+
+\[
+m^{SFL}
+=
+\mathrm{median}(s_1^{SFL}, s_2^{SFL}, \dots, s_K^{SFL})
+\]
+
+\[
+MAD^{SFL}
+=
+\mathrm{median}
+\left(
+|s_k^{SFL} - m^{SFL}|
+\right)
+\]
+
+A client is flagged if:
+
+\[
+s_k^{SFL}
+>
+m^{SFL}
++
+\lambda MAD^{SFL}
+\]
+
+The flagged SFL clients are then excluded from the client-side aggregation:
+
+\[
+\theta_c^{t+1}
+=
+\sum_{k \in \mathcal{K}_{keep}^{SFL}}
+\frac{n_k}{n}
+\theta_{c,k}^{t+1}
+\]
+
+However, the server-side aggregation is intentionally handled differently. In File 05J, the server-side model aggregation keeps all server-side states:
+
+\[
+\theta_s^{t+1}
+=
+\sum_{k=1}^{K}
+\frac{n_k}{n}
+\theta_{s,k}^{t+1}
+\]
+
+This is one of the key split-aware design decisions in the file.
+
+\subsubsection*{Key Difference Between 05I and 05J}
+
+File 05I and File 05J are not the same type of combined defence.
+
+File 05I combines multiple anomaly signals:
+
+\[
+\mathcal{F}_{05I}
+=
+\mathcal{F}_{MAD}
+\cup
+\mathcal{F}_{cosine}
+\]
+
+where:
+\begin{itemize}
+    \item $\mathcal{F}_{MAD}$ is the set of clients flagged by Median/MAD,
+    \item and $\mathcal{F}_{cosine}$ is the set of clients flagged by cosine similarity.
+\end{itemize}
+
+Therefore, File 05I is a multi-signal defence.
+
+File 05J is different. It does not actively combine cosine with MAD in the main decision logic. Instead, it changes the defence location and granularity:
+
+\[
+\text{FL: full-model Median/MAD}
+\]
+
+\[
+\text{SFL: server-observable loss Median/MAD}
+\]
+
+The two key differences between 05I and 05J are therefore:
+
+\begin{enumerate}
+    \item \textbf{05I combines detection signals, while 05J changes the defended region.}
+
+    File 05I asks whether combining Median/MAD with cosine improves detection. File 05J asks whether SFL should be defended differently because the attack surface is split across client-side and server-side components.
+
+    \item \textbf{05J uses server-observable SFL loss rather than historical cosine.}
+
+    In 05J, the SFL server does not need to inspect client weights or use cosine history. It only uses loss values already visible during server-side split learning.
+\end{enumerate}
+
+\subsubsection*{How Privacy is Preserved}
+
+The SFL server does not access:
+\begin{itemize}
+    \item raw client data,
+    \item full client-side model weights,
+    \item or private labels beyond the normal training loss calculation.
+\end{itemize}
+
+The defence uses server-observable signals generated during SFL training. In particular, the server observes:
+\begin{itemize}
+    \item smashed activations,
+    \item server-side losses,
+    \item and gradients required for split backpropagation.
+\end{itemize}
+
+Thus, the defence does not require converting SFL back into full FL or exposing the full client model.
+
+\subsubsection*{Accuracy Graph Analysis}
+
+The accuracy graph shows that File 05J produces one of the strongest overall results observed so far.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figures/05J_accuracy.png}
+    \caption{FL and reconstructed SFL accuracy under the SFL-aware Median/MAD defence using server-observable loss.}
+\end{figure}
+
+The FL model remains stable and converges to approximately:
+
+\[
+0.64 - 0.66
+\]
+
+This is a major improvement compared with:
+\begin{itemize}
+    \item File 05F, where FL collapsed without defence,
+    \item and File 05H, where FL collapsed under cosine-only defence.
+\end{itemize}
+
+The SFL model also improves and reaches approximately:
+
+\[
+0.58 - 0.64
+\]
+
+although its accuracy remains more oscillatory than FL. The oscillation is expected because:
+\begin{itemize}
+    \item the data distribution is extremely non-IID,
+    \item only one label exists per client,
+    \item and the SFL defence filters the client-side aggregation based on server-observable loss.
+\end{itemize}
+
+Compared with File 05G, File 05J achieves broadly comparable final accuracy, but its logic is more SFL-specific. Compared with File 05I, the FL curve remains similarly strong, while the SFL curve is still oscillatory but benefits from an architecture-aware filtering design.
+
+\subsubsection*{Loss Graph Analysis}
+
+The loss graph shows a particularly important difference between FL and SFL.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figures/05J_loss.png}
+    \caption{FL and reconstructed SFL loss under the SFL-aware Median/MAD defence. SFL loss decreases steadily, while FL loss remains more oscillatory.}
+\end{figure}
+
+The SFL loss decreases steadily across communication rounds. This suggests that even though the SFL accuracy oscillates, the model is gradually improving its confidence and optimisation stability.
+
+The FL loss remains higher and more variable. This is logical because the FL attack affects the full model update, so even with Median/MAD filtering, the full-model optimisation trajectory remains more exposed to poisoned behaviour.
+
+\subsubsection*{Comparison with Previous Defences}
+
+Compared with File 05F:
+\begin{itemize}
+    \item 05J clearly prevents full collapse.
+\end{itemize}
+
+Compared with File 05H:
+\begin{itemize}
+    \item 05J performs much better for FL,
+    \item because it does not rely on unstable cosine direction assumptions.
+\end{itemize}
+
+Compared with File 05G:
+\begin{itemize}
+    \item 05J produces similar final robustness,
+    \item but introduces a more SFL-aware defence structure.
+\end{itemize}
+
+Compared with File 05I:
+\begin{itemize}
+    \item 05I is a true multi-signal defence,
+    \item while 05J is a split-aware server-observable defence.
+\end{itemize}
+
+The results are logical because cosine similarity becomes unreliable under one-label-per-client non-IID data. Honest clients naturally produce different update directions. By contrast, server-observable loss is a more directly meaningful signal in SFL because a malicious client should tend to create abnormal server-side training behaviour.
+
+\subsubsection*{Key Conclusion}
+
+File 05J should be interpreted as an SFL-aware defence experiment rather than a cosine-combined defence.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/sfl_aware_defence.png}
+    \caption{SFL-aware defence using server-observable loss statistics.}
+    \label{fig:sfl_aware_defence}
+\end{figure}
+Its main contribution is that it demonstrates:
+
+\begin{quote}
+SFL defence does not need to copy FL defence directly. Instead, it can exploit server-observable signals and the split architecture to identify suspicious clients while preserving privacy.
+\end{quote}
+
+The two strongest findings are:
+
+\begin{enumerate}
+    \item Full-model Median/MAD remains effective for FL because the FL attacker controls the full model.
+    \item Server-observable Median/MAD loss filtering is meaningful for SFL because the server can detect abnormal behaviour without inspecting client-side weights.
+\end{enumerate}
+
+This makes File 05J an important step toward architecture-aware poisoning defence for Split Federated Learning.

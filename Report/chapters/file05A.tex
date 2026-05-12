@@ -1,0 +1,230 @@
+\subsection*{File 05A: FL vs SFL under Extreme Non-IID (Two-Layer Architecture)}
+
+This notebook represents the first major transition from the earlier IID equivalence studies into realistic heterogeneous distributed learning conditions. Files 01 and 02 established the baseline behaviour of Federated Learning (FL) under IID and non-IID data distributions using shallow TwoNN architectures. File 03 then validated that Split Learning (SFL) could reproduce standard neural network training behaviour under IID conditions using a split client/server architecture. File 04 extended this further by proving exact mathematical equivalence between FL and SFL under deterministic training conditions, where both systems produced identical global models with zero L2 distance throughout training. Having established this equivalence foundation, File 05A introduces the first extreme non-IID FL vs SFL comparison using one-label-per-client partitioning without any poisoning attacks or defence mechanisms.
+
+The experiment uses the MNIST handwritten digit dataset with 10 distributed clients. Unlike the earlier IID experiments, each client now receives training data from only a single digit class. This creates an extreme label-skew non-IID environment where clients possess highly specialised and non-overlapping local datasets. Such a configuration significantly increases optimisation difficulty because local client gradients no longer represent the global data distribution.
+
+The implemented neural network architecture is a shallow two-layer fully connected model:
+
+\[
+784 \rightarrow 256 \rightarrow 10
+\]
+
+where:
+\begin{itemize}
+    \item 784 corresponds to the flattened MNIST input image,
+    \item 256 represents the hidden layer dimension,
+    \item and 10 represents the final classification output classes.
+\end{itemize}
+
+This architecture was intentionally selected because it closely resembles the original TwoNN baseline used in earlier FL experiments and had already demonstrated relatively strong robustness under non-IID conditions.
+
+The notebook simultaneously trains two completely separate systems:
+
+\begin{enumerate}
+    \item Standard Federated Learning (FL)
+    \item Split Federated Learning (SFL)
+\end{enumerate}
+
+The FL system follows conventional Federated Averaging (FedAvg). Each client trains a complete local copy of the neural network using local SGD optimisation before transmitting updated model parameters to the server for weighted global aggregation.
+
+The SFL system uses a split architecture where the model is partitioned between client-side and server-side components. In this file, the architecture is divided such that:
+\begin{itemize}
+    \item the client executes the earlier network portion,
+    \item and the server executes the remaining layers.
+\end{itemize}
+
+The client performs forward propagation through the client-side layers and sends intermediate activations to the server. The server then completes the forward pass, computes the loss, performs backpropagation, and returns gradients to the client for local parameter updates.
+
+An important design feature of this notebook is that FL and SFL remain fully independent systems throughout training. The FL global model is trained exclusively using FL aggregation, while the SFL reconstructed global model is trained entirely through separate client-side and server-side aggregation mechanisms. Neither system exchanges gradients, parameters, or updates with the other during optimisation. Their only interaction occurs during post-round evaluation where their final global model states are compared analytically.
+
+To ensure fair comparison between FL and SFL, deterministic training conditions are enforced throughout the notebook. Both systems:
+\begin{itemize}
+    \item start from identical initial weights,
+    \item use identical client dataset assignments,
+    \item use identical mini-batch ordering,
+    \item and apply identical optimisation schedules.
+\end{itemize}
+
+The notebook additionally maintains a decaying learning rate schedule during training. The learning rate is progressively reduced over communication rounds in order to stabilise optimisation under the highly heterogeneous one-label-per-client setting.
+
+\vspace{0.3cm}
+
+\subsubsection*{Mathematical Foundation of FL and SFL Equivalence}
+
+The mathematical objective of this notebook is to verify that Federated Learning (FL) and Split Federated Learning (SFL) perform equivalent optimisation when trained under identical deterministic conditions. Although the architectures are partitioned differently, both systems ultimately attempt to minimise the same global objective function:
+
+\[
+\min_{\theta} \; F(\theta)
+\]
+
+where:
+
+\[
+F(\theta) = \sum_{k=1}^{K} \frac{n_k}{n} F_k(\theta)
+\]
+
+and:
+
+\begin{itemize}
+    \item $K$ represents the number of clients,
+    \item $n_k$ represents the number of samples on client $k$,
+    \item $n$ is the total number of samples across all clients,
+    \item and $F_k(\theta)$ is the local loss function for client $k$.
+\end{itemize}
+
+For each client, the local optimisation objective is:
+
+\[
+F_k(\theta)
+=
+\frac{1}{n_k}
+\sum_{i=1}^{n_k}
+\ell(f_{\theta}(x_i), y_i)
+\]
+
+where:
+\begin{itemize}
+    \item $x_i$ is the input sample,
+    \item $y_i$ is the target label,
+    \item $f_{\theta}(x_i)$ is the neural network prediction,
+    \item and $\ell(\cdot)$ represents the cross-entropy classification loss.
+\end{itemize}
+
+In standard FL, each client independently performs SGD updates on the complete model:
+
+\[
+\theta_k^{(t+1)}
+=
+\theta^{(t)}
+-
+\eta \nabla F_k(\theta^{(t)})
+\]
+
+After local optimisation, the server performs Federated Averaging (FedAvg):
+
+\[
+\theta^{(t+1)}
+=
+\sum_{k=1}^{K}
+\frac{n_k}{n}
+\theta_k^{(t+1)}
+\]
+
+In SFL, the optimisation process remains mathematically equivalent but computationally partitioned between client-side and server-side layers. The model parameters are divided into:
+
+\[
+\theta
+=
+(\theta_c, \theta_s)
+\]
+
+where:
+\begin{itemize}
+    \item $\theta_c$ represents client-side parameters,
+    \item and $\theta_s$ represents server-side parameters.
+\end{itemize}
+
+The client computes forward activations:
+
+\[
+a = f_{\theta_c}(x)
+\]
+
+which are transmitted to the server. The server then computes:
+
+\[
+\hat{y}
+=
+g_{\theta_s}(a)
+\]
+
+followed by the classification loss:
+
+\[
+\ell(\hat{y}, y)
+\]
+
+During backpropagation, gradients are computed on the server:
+
+\[
+\frac{\partial \ell}{\partial \theta_s}
+\]
+
+and activation gradients are returned to the client:
+
+\[
+\frac{\partial \ell}{\partial a}
+\]
+
+allowing the client to compute:
+
+\[
+\frac{\partial \ell}{\partial \theta_c}
+\]
+
+Although the computation is partitioned, the optimisation trajectory remains mathematically identical to standard FL when:
+\begin{itemize}
+    \item initial weights are identical,
+    \item mini-batch ordering is identical,
+    \item client datasets are identical,
+    \item and optimisation hyperparameters remain synchronized.
+\end{itemize}
+
+A major analytical component inherited from File 04 is the comparison between the FL global model and the reconstructed SFL global model using the global L2 distance metric:
+
+\[
+L_2
+=
+\left\|
+\theta_{FL}
+-
+\theta_{SFL}
+\right\|_2
+\]
+
+where:
+\begin{itemize}
+    \item $\theta_{FL}$ represents the FL global model parameters,
+    \item and $\theta_{SFL}$ represents the reconstructed SFL global model parameters.
+\end{itemize}
+
+The Euclidean norm is computed by flattening all parameters into vectors:
+
+\[
+L_2
+=
+\sqrt{
+\sum_{i=1}^{d}
+(\theta_{FL,i} - \theta_{SFL,i})^2
+}
+\]
+
+where:
+\begin{itemize}
+    \item $d$ represents the total number of parameters in the model.
+\end{itemize}
+
+If both systems remain mathematically equivalent throughout optimisation, the L2 distance should remain exactly zero.
+
+\vspace{0.3cm}
+
+\subsubsection*{Results and Observations}
+
+The results demonstrate that both FL and SFL converge identically despite the highly fragmented client distributions. The global accuracy curves overlap perfectly and converge to approximately 0.78 test accuracy after 100 communication rounds. The global loss curves also overlap exactly and decrease steadily from approximately 2.23 to below 0.95 throughout training.
+
+Several important observations emerge from this experiment. First, shallow neural network architectures remain surprisingly trainable even under extremely heterogeneous one-label-per-client conditions. Second, the mathematical equivalence between FL and SFL established in File 04 continues to hold under severe non-IID optimisation settings. Third, maintaining identical deterministic conditions ensures that any future divergence observed in later poisoning or defence experiments can be confidently attributed to attack or defence behaviour rather than implementation inconsistencies.
+
+This file therefore forms the final clean baseline before introducing poisoning attacks and robust defence mechanisms in subsequent experiments.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\linewidth]{figures/05A_accuracy.png}
+    \caption{FL vs reconstructed SFL global test accuracy under extreme non-IID one-label-per-client training using the shallow two-layer architecture. Both systems converge identically to approximately 0.78 accuracy after 100 communication rounds.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\linewidth]{figures/05A_loss.png}
+    \caption{FL vs reconstructed SFL global test loss under extreme non-IID one-label-per-client training. Both systems exhibit identical optimisation behaviour and steadily decreasing loss throughout training.}
+\end{figure}

@@ -1,0 +1,354 @@
+\subsection*{File 05H: Historical Cosine Similarity Defence with Warm-Up Phase}
+
+File 05H extends the poisoning defence investigation by replacing the Median/MAD defence from File 05G with a historical cosine-similarity-based anomaly detection mechanism. The objective of this experiment was to determine whether directional similarity between client updates across communication rounds could provide a more adaptive and privacy-preserving poisoning defence for both Federated Learning (FL) and Split Federated Learning (SFL).
+
+The experiment continues using:
+\begin{itemize}
+    \item the MNIST dataset,
+    \item the extreme one-label-per-client non-IID configuration,
+    \item the three-layer MLP architecture,
+    \item and the same Scale Gradient Attack (SGA) poisoning attack introduced in File 05F.
+\end{itemize}
+
+The model architecture remains:
+
+\[
+784 \rightarrow 256 \rightarrow 128 \rightarrow 10
+\]
+
+with the SFL split defined as:
+
+\[
+\text{Client side: } 784 \rightarrow 256
+\]
+
+\[
+\text{Server side: } 256 \rightarrow 128 \rightarrow 10
+\]
+
+Unlike File 05G, which used update magnitudes and Median/MAD robust statistics, File 05H attempts to detect poisoning based on directional inconsistency of client updates over time.
+
+\subsubsection*{Motivation for Historical Cosine Defence}
+
+The motivation behind cosine-similarity-based defence was that poisoning attacks often change the direction of optimisation updates, not only their magnitude.
+
+In normal training:
+\begin{itemize}
+    \item client updates should gradually follow relatively consistent optimisation directions,
+    \item especially when local data distributions remain stable across rounds.
+\end{itemize}
+
+A malicious client performing SGA poisoning introduces highly abnormal directional changes, even if update magnitudes are clipped or controlled.
+
+Therefore, instead of measuring only update size, File 05H measures whether the direction of a client's update remains consistent with its own historical behaviour.
+
+\subsubsection*{Historical Warm-Up Phase}
+
+One major challenge in cosine-based defences is that early training rounds naturally contain unstable gradients.
+
+During initial optimisation:
+\begin{itemize}
+    \item honest client updates can differ significantly,
+    \item particularly under extreme non-IID conditions.
+\end{itemize}
+
+To reduce false positives, a warm-up phase was introduced.
+
+During the warm-up period:
+\begin{itemize}
+    \item no clients are flagged,
+    \item and historical memory vectors are gradually accumulated.
+\end{itemize}
+
+This allows the defence to first learn:
+\begin{itemize}
+    \item the normal optimisation behaviour of each client.
+\end{itemize}
+
+Without this warm-up phase:
+\begin{itemize}
+    \item the defence frequently classified honest clients as malicious during early rounds.
+\end{itemize}
+
+\subsubsection*{Mathematics of Cosine Similarity}
+
+For each client update vector:
+
+\[
+u_k^{(t)}
+\]
+
+the cosine similarity with the client's historical reference vector:
+
+\[
+h_k^{(t-1)}
+\]
+
+is computed as:
+
+\[
+\cos(\theta_k)
+=
+\frac{
+u_k^{(t)}
+\cdot
+h_k^{(t-1)}
+}{
+\|u_k^{(t)}\|
+\,
+\|h_k^{(t-1)}\|
+}
+\]
+
+where:
+\begin{itemize}
+    \item values close to \(1\) indicate highly aligned updates,
+    \item values near \(0\) indicate orthogonal behaviour,
+    \item and negative values indicate opposite optimisation directions.
+\end{itemize}
+
+Clients with unusually low cosine similarity are considered suspicious.
+
+\subsubsection*{Historical EMA Reference Vector}
+
+The historical reference vector is updated using an Exponential Moving Average (EMA):
+
+\[
+h_k^{(t)}
+=
+\alpha
+h_k^{(t-1)}
++
+(1-\alpha)
+u_k^{(t)}
+\]
+
+where:
+\begin{itemize}
+    \item \(h_k^{(t)}\) is the historical memory vector,
+    \item \(u_k^{(t)}\) is the current update,
+    \item and \(\alpha\) is the EMA smoothing coefficient.
+\end{itemize}
+
+This allows the defence to:
+\begin{itemize}
+    \item retain long-term optimisation behaviour,
+    \item while still adapting gradually to changing gradients.
+\end{itemize}
+
+The historical EMA mechanism was substantially more stable than:
+\begin{itemize}
+    \item simple round-to-round cosine comparison,
+    \item or direct global-reference cosine comparison.
+\end{itemize}
+
+\subsubsection*{Other Cosine Defences Attempted}
+
+Several alternative cosine-based approaches were tested before settling on the historical warm-up implementation:
+
+\begin{enumerate}
+    \item \textbf{Direct round-to-round cosine similarity}
+    \begin{itemize}
+        \item compared each update only against the previous round,
+        \item but became extremely unstable under non-IID distributions.
+    \end{itemize}
+
+    \item \textbf{Global-model cosine comparison}
+    \begin{itemize}
+        \item compared client updates against the global model update,
+        \item but honest non-IID clients naturally diverged strongly from the global direction.
+    \end{itemize}
+
+    \item \textbf{Pure cosine thresholding without warm-up}
+    \begin{itemize}
+        \item produced excessive false positives during early rounds.
+    \end{itemize}
+
+    \item \textbf{Fixed cosine thresholds}
+    \begin{itemize}
+        \item failed because cosine distributions changed substantially throughout training.
+    \end{itemize}
+\end{enumerate}
+
+The historical EMA warm-up version performed better because:
+\begin{itemize}
+    \item it personalised the reference behaviour for each client,
+    \item and reduced early-round instability.
+\end{itemize}
+
+\subsubsection*{How Cosine Defence was Applied in FL}
+
+In FL:
+\begin{itemize}
+    \item the attack affects all three model layers,
+    \item therefore the cosine similarity is computed on the full flattened model update vector.
+\end{itemize}
+
+For each FL client:
+
+\[
+u_k^{FL}
+=
+\theta_k^{(t)}
+-
+\theta^{(t-1)}
+\]
+
+The cosine score is computed using the client's full update vector against its EMA historical memory.
+
+Flagged clients are excluded from aggregation:
+
+\[
+\mathcal{K}_{keep}
+=
+\{
+k \mid \cos(\theta_k) \geq \tau
+\}
+\]
+
+The remaining honest clients are aggregated normally.
+
+\subsubsection*{How Cosine Defence was Applied in SFL}
+
+In SFL:
+\begin{itemize}
+    \item only the client-side layer is directly poisoned by the attacker.
+\end{itemize}
+
+Therefore:
+\begin{itemize}
+    \item cosine similarity is computed only on the client-side FL update portion.
+\end{itemize}
+
+This means the defence evaluates:
+\begin{itemize}
+    \item client-observable optimisation behaviour,
+    \item without exposing raw data,
+    \item activations,
+    \item or labels.
+\end{itemize}
+
+Importantly:
+\begin{itemize}
+    \item the SFL server still does not directly access private client datasets.
+\end{itemize}
+
+Only optimisation statistics are exchanged.
+
+The SFL server-side aggregation remains separate:
+
+\[
+\theta_s^{t+1}
+=
+\sum_{k=1}^{K}
+\frac{n_k}{n}
+\theta_{s,k}^{t+1}
+\]
+
+while the client-side FL aggregation uses cosine-filtered updates.
+
+\subsubsection*{Results and Interpretation}
+
+Compared to File 05F (no defence):
+\begin{itemize}
+    \item File 05H clearly improves SFL robustness.
+\end{itemize}
+
+The SFL model:
+\begin{itemize}
+    \item eventually recovers,
+    \item and reaches approximately \(0.58-0.60\) accuracy.
+\end{itemize}
+
+This represents a major improvement over:
+\begin{itemize}
+    \item the undefended poisoning experiment,
+    \item where optimisation became substantially more unstable.
+\end{itemize}
+
+However, the FL system still collapses catastrophically.
+
+The FL accuracy falls toward:
+
+\[
+0.10
+\]
+
+which corresponds approximately to random guessing on MNIST.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/05H_accuracy.png}
+    \caption{FL vs reconstructed SFL global test accuracy using the historical cosine defence with warm-up. SFL partially recovers, while FL still collapses under poisoning.}
+\end{figure}
+
+The FL loss also explodes dramatically:
+
+\[
+\text{loss} \rightarrow 70
+\]
+
+indicating:
+\begin{itemize}
+    \item severe optimisation divergence,
+    \item and failure of the cosine defence to sufficiently isolate poisoned FL updates.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/05H_loss.png}
+    \caption{FL vs reconstructed SFL global test loss under historical cosine defence. FL diverges catastrophically while SFL remains comparatively stable.}
+\end{figure}
+
+\subsubsection*{Why Cosine Defence Still Did Not Work Well}
+
+Although cosine similarity improved SFL stability somewhat, the overall defence remained substantially weaker than the Median/MAD defence from File 05G.
+
+Several reasons explain this:
+
+\begin{enumerate}
+    \item \textbf{Extreme non-IID behaviour naturally changes update directions}
+    \begin{itemize}
+        \item honest clients frequently appear directionally inconsistent.
+    \end{itemize}
+
+    \item \textbf{Cosine similarity ignores update magnitude}
+    \begin{itemize}
+        \item a poisoned update can still align directionally while having destructive magnitude.
+    \end{itemize}
+
+    \item \textbf{Small client count}
+    \begin{itemize}
+        \item only 10 clients were available,
+        \item reducing statistical robustness.
+    \end{itemize}
+
+    \item \textbf{Deep model splitting}
+    \begin{itemize}
+        \item SFL client-side updates already contain reduced information compared to full FL updates.
+    \end{itemize}
+
+    \item \textbf{Historical drift}
+    \begin{itemize}
+        \item the EMA memory gradually adapts,
+        \item meaning malicious updates can slowly contaminate historical references.
+    \end{itemize}
+\end{enumerate}
+
+Overall, File 05H demonstrated that:
+\begin{itemize}
+    \item cosine-based directional defences alone are insufficient under strong poisoning attacks and extreme non-IID settings,
+    \item although SFL naturally remains more robust than FL,
+    \item and historical warm-up mechanisms significantly outperform naive cosine-threshold methods.
+\end{itemize}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/historical_cosine_defence.png}
+    \caption{Historical cosine similarity defence using EMA memory vectors.}
+    \label{fig:historical_cosine}
+\end{figure}
+The experiment also provided strong motivation for the later combined defence approaches implemented in Files 05I and 05J, where:
+\begin{itemize}
+    \item cosine similarity was integrated with Median/MAD statistics,
+    \item rather than being used independently.
+\end{itemize}

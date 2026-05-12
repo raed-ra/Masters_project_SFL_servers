@@ -1,0 +1,56 @@
+\subsection*{File 03: Split Learning vs Full Model Comparison}
+
+This experiment implemented and compared a standard centralized neural network against a Split Learning (SL) version of the same architecture. The objective was to verify whether splitting the model between a client and server changes the learning behaviour or final model performance under controlled IID conditions.
+
+The experiment was performed on the MNIST dataset using a single client. The neural network was divided into:
+\begin{itemize}
+    \item Client side: first 2 layers
+    \item Server side: remaining 3 layers
+\end{itemize}
+
+Both the full model and split model used:
+\begin{itemize}
+    \item identical initialization,
+    \item identical optimizer settings,
+    \item identical learning rate,
+    \item and the same training data.
+\end{itemize}
+
+The purpose of this setup was to ensure that any observed differences would result only from the split architecture itself.
+
+\subsection*{Results}
+
+The results showed that the split model achieved nearly identical behaviour to the centralized full model:
+\begin{itemize}
+    \item Test accuracy converged to approximately 97--98\%
+    \item Test loss curves almost completely overlapped
+    \item Both models followed nearly identical convergence behaviour throughout training
+\end{itemize}
+
+These results confirm that Split Learning can reproduce centralized learning performance under IID conditions when implemented correctly.
+
+
+The overlapping accuracy and loss curves indicate that gradient propagation across the client-server boundary was functioning correctly. The experiment demonstrated that partitioning the model between client and server does not inherently reduce learning capability.
+
+This notebook therefore established the correctness of the Split Learning pipeline before extending the work toward Split Federated Learning (SFL), multiple clients, Non-IID distributions, poisoning attacks, and defence mechanisms.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/file03_accuracy.png}
+    \caption{Test Accuracy: Full Model vs Split Model}
+    \label{fig:file03_accuracy}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/file03_loss.png}
+    \caption{Test Loss: Full Model vs Split Model}
+    \label{fig:file03_loss}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figures/fl_vs_sfl_architecture.png}
+    \caption{Split Federated Learning architecture.}
+    \label{fig:fl_sfl_architecture}
+\end{figure}

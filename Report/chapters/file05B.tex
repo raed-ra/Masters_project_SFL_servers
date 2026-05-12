@@ -1,0 +1,73 @@
+\subsection*{File 05B: FL vs SFL under Extreme Non-IID (Three-Layer Architecture)}
+
+Following the successful equivalence validation achieved in File 05A using the shallow two-layer architecture, this notebook extends the investigation by increasing the model depth to a three-layer neural network architecture. The objective of this file is to study how increasing architectural complexity affects optimisation behaviour under extreme non-IID one-label-per-client conditions while maintaining equivalence between Federated Learning (FL) and Split Federated Learning (SFL).
+
+The motivation for progressing from File 05A to File 05B was based on several observations from the earlier experiments. The shallow two-layer architecture demonstrated strong convergence and stability even under severe client heterogeneity, reaching approximately 0.78 test accuracy after 100 communication rounds. However, the model structure remained relatively simple and provided only a minimal split configuration for SFL. To better represent realistic Split Federated Learning behaviour and prepare for later poisoning attack experiments, a deeper architecture was required where the client-side and server-side model partitions became more meaningful.
+
+The architecture implemented in this notebook is a three-layer fully connected neural network:
+
+\[
+784 \rightarrow 256 \rightarrow 128 \rightarrow 10
+\]
+
+where:
+\begin{itemize}
+    \item 784 corresponds to the flattened MNIST image input,
+    \item 256 and 128 represent hidden layer dimensions,
+    \item and 10 represents the output classification layer.
+\end{itemize}
+
+Unlike File 05A, which used a simpler split, this notebook partitions the architecture into:
+\begin{itemize}
+    \item one client-side layer,
+    \item and two server-side layers.
+\end{itemize}
+
+This creates a more representative Split Federated Learning setup where the server performs a larger portion of the computation and parameter optimisation process.
+
+The experiment continues to use the MNIST dataset under the extreme non-IID one-label-per-client partitioning strategy. Ten distributed clients are simulated, where each client receives samples belonging to only a single digit class. As in File 05A, both FL and SFL are trained completely independently under identical deterministic conditions. Both systems:
+\begin{itemize}
+    \item start from identical initial weights,
+    \item use identical client dataset assignments,
+    \item use identical mini-batch ordering,
+    \item and apply identical optimisation schedules.
+\end{itemize}
+
+This notebook also introduces several optimisation refinements compared to File 05A. A decaying learning rate schedule is maintained throughout training in order to improve stability under the deeper architecture. Separate client-side and server-side aggregation mechanisms are also explicitly maintained for the SFL implementation, further reinforcing the independence between FL and SFL training dynamics.
+
+As established in File 04 and File 05A, the FL global model and reconstructed SFL global model remain mathematically equivalent throughout training. The reconstructed SFL global model is formed by combining the aggregated client-side layers and aggregated server-side layers into a complete network representation. The global L2 distance between FL and reconstructed SFL is continuously monitored to verify numerical equivalence between the two optimisation systems.
+
+The results demonstrate that both FL and SFL again converge identically throughout training, confirming that the mathematical equivalence between FL and SFL continues to hold even after increasing architectural depth. However, compared to File 05A, several important behavioural changes are observed.
+
+The global accuracy converges to approximately 0.72--0.73 after 100 communication rounds, which is noticeably lower than the approximately 0.78 accuracy achieved by the shallower two-layer architecture in File 05A. Additionally, the optimisation trajectory becomes more oscillatory and less stable during intermediate communication rounds. The loss curve decreases steadily throughout training but remains substantially higher than the final loss achieved by the shallower architecture.
+
+These results suggest that increasing model depth significantly increases optimisation difficulty under extreme one-label-per-client non-IID conditions. Because each client only observes a single label class, deeper architectures appear more sensitive to client drift and conflicting local optimisation directions. The additional representational capacity introduced by the deeper model does not compensate for the severe heterogeneity of the client distributions.
+
+Despite the reduction in final accuracy, this architecture was selected as the primary baseline for later poisoning attack experiments. The reason for this decision is that the three-layer structure provides a much more meaningful Split Federated Learning partition, where:
+\begin{itemize}
+    \item the client controls only the earlier feature extraction layer,
+    \item while the server controls the deeper representation and classification layers.
+\end{itemize}
+
+This creates a more realistic attack surface for later poisoning attack studies and defence mechanism development.
+
+Overall, File 05B establishes an important transition point in the project. The notebook demonstrates that:
+\begin{itemize}
+    \item FL and SFL equivalence continues to hold under deeper architectures,
+    \item increasing model depth amplifies optimisation difficulty under extreme non-IID conditions,
+    \item and shallow architectures may actually be more robust than deeper architectures when clients possess highly fragmented local data distributions.
+\end{itemize}
+
+These observations directly motivated the later poisoning attack experiments and defence mechanism investigations developed in subsequent files.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\linewidth]{figures/05B_accuracy.png}
+    \caption{FL vs reconstructed SFL global test accuracy under extreme non-IID one-label-per-client training using the deeper three-layer architecture. Both systems converge identically but achieve lower final accuracy compared to the shallower two-layer model from File 05A.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\linewidth]{figures/05B_loss.png}
+    \caption{FL vs reconstructed SFL global test loss under extreme non-IID one-label-per-client training using the three-layer architecture. The optimisation trajectory remains stable but converges more slowly compared to the shallower architecture.}
+\end{figure}

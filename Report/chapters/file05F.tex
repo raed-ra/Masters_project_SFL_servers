@@ -1,0 +1,173 @@
+\subsection*{File 05F: SGA Poisoning Attack on FL and SFL}
+
+After completing the clean baseline experiments in Files 05A--05E, File 05F introduces the first poisoning attack experiment. Based on the previous results, the three-layer MNIST model was selected because it provided the best balance between trainability and a meaningful SFL split. The experiment uses MNIST under the extreme one-label-per-client non-IID setting with 10 clients. The architecture is:
+
+\[
+784 \rightarrow 256 \rightarrow 128 \rightarrow 10
+\]
+
+For SFL, the model is split into:
+\[
+\text{Client side: } 784 \rightarrow 256
+\]
+\[
+\text{Server side: } 256 \rightarrow 128 \rightarrow 10
+\]
+
+The malicious client is client 0. In FL, the attacker can poison the full model update. In SFL, the attacker can only poison the client-side layer, because the server-side layers are not directly controlled by the client. This makes the SFL attack weaker, but also more difficult to detect because the server only observes partial behaviour.
+
+\subsubsection*{Attack Implementation}
+
+The poisoning attack used in this file is a Scale Gradient Attack (SGA). In FL, the malicious client modifies the full model update:
+
+\[
+\Delta \theta^{attack}_{FL}
+=
+-\alpha_{FL} \Delta \theta_{FL}
+\]
+
+where:
+
+\[
+\alpha_{FL} = 0.01
+\]
+
+Although the FL attack scale appears small, it affects the full model update, including all layers. This makes the attack very destructive.
+
+In SFL, the attack is applied only to the client-side update:
+
+\[
+\Delta \theta^{attack}_{c}
+=
+-\alpha_{SFL} \Delta \theta_{c}
+\]
+
+where:
+
+\[
+\alpha_{SFL} = 20.0
+\]
+
+The larger SFL attack scale was needed because the attacker only controls the first layer. The server-side layers remain outside the attacker’s direct control.
+
+The SFL client-side aggregation is still similar to a small FL process over the client-side model:
+
+\[
+\theta_c^{t+1}
+=
+\sum_{k=1}^{K}
+\frac{n_k}{n}
+\theta_{c,k}^{t+1}
+\]
+
+The server-side parameters are aggregated separately:
+
+\[
+\theta_s^{t+1}
+=
+\sum_{k=1}^{K}
+\frac{n_k}{n}
+\theta_{s,k}^{t+1}
+\]
+
+The reconstructed SFL model is then formed by combining:
+
+\[
+\theta_{SFL}^{t+1}
+=
+(\theta_c^{t+1}, \theta_s^{t+1})
+\]
+
+\subsubsection*{Diagnostic Parameters}
+
+The generated results table includes several useful diagnostic fields. The field \texttt{attack\_scale\_fl} records the scale used for the FL attack, while \texttt{attack\_scale\_sfl} records the scale used for the SFL attack. The field \texttt{grad\_clipping\_enabled} indicates whether gradients were clipped to prevent numerical explosion. In this file, gradient clipping was disabled:
+
+\[
+\texttt{grad\_clipping\_enabled = False}
+\]
+
+The field \texttt{max\_grad\_norm} would define the maximum allowed gradient norm if clipping were enabled. Since clipping was disabled, it is recorded as:
+
+\[
+\texttt{max\_grad\_norm = None}
+\]
+
+The metric \texttt{fl\_minus\_sfl\_accuracy} is calculated as:
+
+\[
+A_{diff}
+=
+A_{FL}
+-
+A_{SFL}
+\]
+
+A negative value means SFL is outperforming FL. This becomes important later in training, when FL collapses but SFL continues learning.
+
+The global L2 distance is calculated as:
+
+\[
+L_2
+=
+\left\|
+\theta_{FL}
+-
+\theta_{SFL}
+\right\|_2
+\]
+
+Unlike the earlier clean equivalence experiments, the L2 distance is now expected to become non-zero because FL and SFL are no longer receiving equivalent attacks. FL is attacked across the full model, while SFL is attacked only on the client-side layer. Therefore, their optimisation paths naturally diverge. Later in training, FL becomes numerically unstable and some L2 values become \texttt{NaN}, which reflects the collapse of the FL model rather than an equivalence failure in the clean setup.
+
+\subsubsection*{Sample Output Table}
+
+Table~\ref{tab:05f_sample_results} shows sample rows from the generated results table. Only selected columns are shown for readability.
+
+\begin{table}[H]
+\centering
+\caption{Sample diagnostic rows from File 05F SGA attack experiment.}
+\label{tab:05f_sample_results}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{ccccccccc}
+\hline
+Round & Attack & Malicious Client & FL Attack & SFL Attack & $\alpha_{FL}$ & $\alpha_{SFL}$ & FL Acc. & SFL Acc. \\
+\hline
+1 & True & 0 & full\_model\_sga & client\_side\_gradient\_reversal & 0.01 & 20.0 & 0.1746 & 0.0980 \\
+2 & True & 0 & full\_model\_sga & client\_side\_gradient\_reversal & 0.01 & 20.0 & 0.1902 & 0.0980 \\
+3 & True & 0 & full\_model\_sga & client\_side\_gradient\_reversal & 0.01 & 20.0 & 0.1534 & 0.0980 \\
+96 & True & 0 & full\_model\_sga & client\_side\_gradient\_reversal & 0.01 & 20.0 & $\sim$0.10 & 0.3739 \\
+97 & True & 0 & full\_model\_sga & client\_side\_gradient\_reversal & 0.01 & 20.0 & $\sim$0.10 & 0.6250 \\
+100 & True & 0 & full\_model\_sga & client\_side\_gradient\_reversal & 0.01 & 20.0 & $\sim$0.10 & 0.3414 \\
+\hline
+\end{tabular}
+}
+\end{table}
+
+\subsubsection*{Results and Interpretation}
+
+Figure~\ref{fig:05f_accuracy} shows that FL collapses rapidly under the SGA attack. The FL accuracy falls to approximately 0.10, which is close to random guessing for a 10-class classification problem. This confirms that full-model poisoning in FL is highly destructive because the attacker controls all layers.
+
+In contrast, SFL does not fully collapse. The SFL accuracy is highly unstable and oscillatory, but it continues to recover during later rounds and reaches values above 0.60 in some rounds. This shows that SFL has a natural partial robustness because the attacker only controls the client-side layer.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\linewidth]{figures/05F_accuracy.png}
+    \caption{FL vs reconstructed SFL global test accuracy under the SGA poisoning attack. FL collapses toward random accuracy, while SFL remains unstable but continues partial learning.}
+    \label{fig:05f_accuracy}
+\end{figure}
+
+Figure~\ref{fig:05f_loss} confirms the same behaviour from the loss perspective. FL loss explodes rapidly, indicating numerical and optimisation collapse. SFL loss increases and becomes unstable around the middle rounds, but it later returns to a more controlled range. This supports the conclusion that the SFL attack is weaker because it is restricted to the client-side layer.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\linewidth]{figures/05F_loss.png}
+    \caption{FL vs reconstructed SFL global test loss under the SGA poisoning attack. FL loss diverges catastrophically, while SFL avoids complete collapse despite instability.}
+    \label{fig:05f_loss}
+\end{figure}
+Figure~\ref{fig:sga_attack}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.1\linewidth]{figures/sga_attack.png}
+    \caption{Comparison of SGA poisoning in FL and SFL architectures.}
+    \label{fig:sga_attack}
+\end{figure}
+Overall, File 05F demonstrates that FL and SFL behave very differently under poisoning attacks. In the clean experiments, FL and SFL remained mathematically equivalent. In this attack experiment, the systems naturally diverge because the attack is applied to different parts of the model. This result motivates the later defence experiments, where robust aggregation and SFL-aware defence mechanisms are introduced.

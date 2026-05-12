@@ -1,0 +1,76 @@
+\subsection*{File 05C: FL vs SFL under Extreme Non-IID using Fashion-MNIST}
+
+After establishing in File 05B that deeper three-layer architectures remain mathematically equivalent between Federated Learning (FL) and Split Federated Learning (SFL) under extreme one-label-per-client conditions, the next logical progression was to investigate whether the same behaviour would persist when the underlying dataset became significantly more complex. File 05C therefore replaces the MNIST handwritten digit dataset with the Fashion-MNIST (FMNIST) dataset while maintaining the same overall FL and SFL architecture and experimental design.
+
+The motivation for this transition was based on an important limitation observed in earlier experiments. MNIST is a relatively simple and highly separable dataset where many classes possess distinct visual structures. Although the one-label-per-client partitioning created severe heterogeneity, the classification task itself remained comparatively easy. Fashion-MNIST introduces substantially greater class overlap and visual similarity between categories such as shirts, pullovers, coats, and t-shirts. As a result, local client optimisation under one-label-per-client conditions becomes much more difficult because clients train on highly specialised but visually ambiguous distributions.
+
+The experiment again uses ten distributed clients under an extreme non-IID setting where each client receives training samples belonging to only a single class. However, unlike the earlier MNIST experiments, the local distributions now contain significantly more feature overlap between classes that are not visible to individual clients during training.
+
+The neural network architecture remains identical to File 05B:
+
+\[
+784 \rightarrow 256 \rightarrow 128 \rightarrow 10
+\]
+
+with:
+\begin{itemize}
+    \item a single client-side layer,
+    \item and two server-side layers.
+\end{itemize}
+
+Maintaining the same architecture was important because it allowed the experiment to isolate the effect of dataset complexity while keeping the FL and SFL optimisation structures unchanged.
+
+As in the previous files, the notebook trains two completely independent systems:
+\begin{enumerate}
+    \item a standard Federated Learning (FL) system,
+    \item and a Split Federated Learning (SFL) system.
+\end{enumerate}
+
+Both systems:
+\begin{itemize}
+    \item begin from identical initial weights,
+    \item use identical client dataset partitions,
+    \item use identical mini-batch ordering,
+    \item and apply the same learning rate decay schedule.
+\end{itemize}
+
+The reconstructed SFL global model is again formed by combining the aggregated client-side layers and aggregated server-side layers into a single complete neural network representation. The global L2 distance between the FL global model and reconstructed SFL model continues to be monitored in the same manner as earlier files in order to verify that both systems remain mathematically equivalent throughout optimisation.
+
+Since the deterministic equivalence framework established in Files 04, 05A, and 05B remains unchanged, the L2 calculation methodology is identical and therefore not repeated in detail in this section. The key focus of this experiment is instead the behavioural impact of increased dataset complexity under extreme heterogeneity.
+
+The results show a significant reduction in overall optimisation performance compared to the earlier MNIST experiments. The final test accuracy converges to approximately 0.64--0.65 after 100 communication rounds, compared to approximately 0.72--0.73 achieved in File 05B using MNIST. The training process also becomes substantially more unstable, with large oscillations in both accuracy and loss throughout optimisation.
+
+Several important observations emerge from these results.
+
+First, the equivalence between FL and SFL continues to hold even under substantially more difficult optimisation conditions. The FL and reconstructed SFL accuracy curves overlap throughout training, confirming that the split architecture itself does not introduce optimisation inconsistency.
+
+Second, the combination of:
+\begin{itemize}
+    \item extreme non-IID distributions,
+    \item deeper architectures,
+    \item and increased dataset complexity
+\end{itemize}
+
+creates a highly unstable optimisation environment. Because each client observes only one Fashion-MNIST class, local gradients become strongly biased toward narrow local feature representations that generalise poorly to the unseen global distribution.
+
+Third, the experiment demonstrates that deeper architectures under extreme heterogeneity become increasingly sensitive to dataset complexity. Whereas the MNIST experiments remained relatively stable, the Fashion-MNIST experiments exhibit persistent oscillatory behaviour throughout training, particularly during the earlier communication rounds.
+
+This file therefore establishes an important insight for the later poisoning attack studies. It demonstrates that under realistic heterogeneous distributed learning conditions, optimisation instability can already emerge naturally even without adversarial behaviour. This makes robust poisoning attack detection significantly more challenging because the system must distinguish between:
+\begin{itemize}
+    \item naturally unstable but legitimate client updates,
+    \item and intentionally malicious poisoned updates.
+\end{itemize}
+
+The observations from this experiment directly motivated the later decision to return to the MNIST dataset in subsequent files before introducing poisoning attacks and defence mechanisms. Although Fashion-MNIST provided a more realistic optimisation challenge, the natural instability introduced by the dataset made it difficult to isolate the specific effects of adversarial poisoning behaviour.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\linewidth]{figures/05C_accuracy.png}
+    \caption{FL vs reconstructed SFL global test accuracy under extreme non-IID one-label-per-client training using Fashion-MNIST and the three-layer architecture. Both systems remain equivalent but exhibit significantly greater instability compared to the earlier MNIST experiments.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\linewidth]{figures/05C_loss.png}
+    \caption{FL vs reconstructed SFL global test loss under extreme non-IID one-label-per-client Fashion-MNIST training. The optimisation trajectory remains highly oscillatory throughout training due to increased dataset complexity and client heterogeneity.}
+\end{figure}

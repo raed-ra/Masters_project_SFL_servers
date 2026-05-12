@@ -1,0 +1,124 @@
+\subsection*{File 05D: FL vs SFL under Extreme Non-IID using CIFAR-10}
+
+After investigating the impact of increased dataset complexity using Fashion-MNIST in File 05C, the next stage of the project further increased the learning difficulty by transitioning to the CIFAR-10 dataset. File 05D therefore represents the most challenging clean optimisation experiment conducted prior to introducing poisoning attacks and defence mechanisms.
+
+The primary motivation for progressing from File 05C to File 05D was to study how FL and SFL behave under:
+\begin{itemize}
+    \item extreme non-IID client distributions,
+    \item deeper architectures,
+    \item and significantly more complex visual feature spaces.
+\end{itemize}
+
+Whereas Fashion-MNIST still contains grayscale images with relatively structured object shapes, CIFAR-10 introduces:
+\begin{itemize}
+    \item coloured RGB images,
+    \item greater intra-class variation,
+    \item lower spatial resolution,
+    \item and substantially more difficult feature extraction requirements.
+\end{itemize}
+
+This creates a much more realistic and difficult distributed optimisation environment.
+
+The dataset used in this notebook is CIFAR-10, consisting of 10 object categories such as:
+\begin{itemize}
+    \item airplanes,
+    \item automobiles,
+    \item birds,
+    \item cats,
+    \item dogs,
+    \item ships,
+    \item and trucks.
+\end{itemize}
+
+As in the previous experiments, the data distribution follows an extreme one-label-per-client partitioning strategy. Each distributed client receives training samples belonging to only a single CIFAR-10 class. Under this configuration, clients learn highly specialised local representations with minimal exposure to the global data distribution.
+
+The neural network architecture remains intentionally identical to File 05B and File 05C:
+
+\[
+3072 \rightarrow 256 \rightarrow 128 \rightarrow 10
+\]
+
+where:
+\begin{itemize}
+    \item 3072 corresponds to the flattened CIFAR-10 RGB image input,
+    \item since CIFAR-10 images contain:
+    \[
+    32 \times 32 \times 3 = 3072
+    \]
+    input features,
+    \item 256 and 128 represent hidden layer dimensions,
+    \item and 10 corresponds to the output classification layer.
+\end{itemize}
+
+The Split Federated Learning (SFL) partition also remains unchanged:
+\begin{itemize}
+    \item one layer resides on the client side,
+    \item while two layers remain on the server side.
+\end{itemize}
+
+Maintaining the same architecture and split configuration was important because it isolated the effect of increasing dataset complexity while preserving the underlying optimisation structure established in previous files.
+
+The training framework again maintains two completely independent optimisation systems:
+\begin{enumerate}
+    \item standard Federated Learning (FL),
+    \item and Split Federated Learning (SFL).
+\end{enumerate}
+
+Both systems:
+\begin{itemize}
+    \item begin from identical initial weights,
+    \item use identical client partitions,
+    \item use identical mini-batch ordering,
+    \item and apply the same decaying learning rate schedule.
+\end{itemize}
+
+The reconstructed SFL global model is again formed by combining:
+\begin{itemize}
+    \item the aggregated client-side parameters,
+    \item and the aggregated server-side parameters.
+\end{itemize}
+
+The global L2 distance between the FL global model and reconstructed SFL model continues to be monitored throughout training using the same methodology introduced in File 04 and maintained in Files 05A--05C. Since the deterministic equivalence framework remains unchanged, the L2 calculation procedure itself is not modified in this experiment.
+
+The results show a dramatic degradation in optimisation performance compared to all previous datasets. The final global test accuracy converges to only approximately 0.25 after 100 communication rounds, while the loss remains extremely high throughout training.
+
+Several important observations emerge from this experiment.
+
+First, the equivalence between FL and SFL still holds despite the severe optimisation difficulty. The FL and reconstructed SFL accuracy curves continue to overlap, confirming that the split computation structure itself is not responsible for the optimisation instability.
+
+Second, the experiment demonstrates that extreme one-label-per-client heterogeneity becomes increasingly destructive as dataset complexity increases. Unlike MNIST, where local client gradients still contained reasonably separable feature information, CIFAR-10 requires substantially richer feature representations and stronger cross-client knowledge sharing. Under one-label-per-client partitioning, clients are unable to construct meaningful global representations because each client observes only a narrow subset of the feature space.
+
+Third, the three-layer fully connected architecture becomes insufficient for learning CIFAR-10 effectively under such heterogeneous conditions. Unlike convolutional neural networks (CNNs), which can exploit spatial image structure, the fully connected multilayer perceptron (MLP) used in this notebook struggles to extract robust visual features from CIFAR-10 images.
+
+The optimisation trajectory also becomes highly unstable throughout training. Large oscillations appear in both the accuracy and loss curves, and convergence remains slow even after 100 communication rounds. These behaviours indicate that:
+\begin{itemize}
+    \item local client gradients are highly conflicting,
+    \item client drift becomes severe,
+    \item and global aggregation struggles to produce coherent optimisation directions.
+\end{itemize}
+
+An important conclusion from this experiment was that combining:
+\begin{itemize}
+    \item extreme non-IID distributions,
+    \item deeper architectures,
+    \item fully connected MLPs,
+    \item and highly complex datasets
+\end{itemize}
+
+creates an optimisation environment that is already naturally unstable even without adversarial attacks.
+
+This observation became highly significant for the later poisoning attack experiments. If the clean baseline itself exhibits substantial instability, then distinguishing malicious poisoned behaviour from naturally unstable optimisation becomes extremely difficult. As a result, after completing this experiment, the later poisoning attack and defence studies returned to the MNIST dataset in order to isolate adversarial behaviour more clearly while still maintaining sufficiently challenging non-IID conditions.
+
+Therefore, File 05D represents the final clean optimisation stress test before introducing poisoning attacks and defence mechanisms in the subsequent files.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\linewidth]{figures/05D_accuracy.png}
+    \caption{FL vs reconstructed SFL global test accuracy under extreme non-IID one-label-per-client training using CIFAR-10 and the three-layer architecture. Both systems remain equivalent but converge to substantially lower accuracy due to the increased dataset complexity.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\linewidth]{figures/05D_loss.png}
+    \caption{FL vs reconstructed SFL global test loss under extreme non-IID one-label-per-client CIFAR-10 training. The optimisation trajectory remains highly unstable with persistently large loss values throughout training.}
+\end{figure}

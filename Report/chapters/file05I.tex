@@ -1,0 +1,427 @@
+\subsection*{File 05I: Combined Median/MAD and Historical Cosine Defence}
+
+File 05I represents the first true hybrid defence model developed in this project. After independently evaluating:
+\begin{itemize}
+    \item the Median/MAD statistical defence in File 05G,
+    \item and the historical cosine-similarity defence in File 05H,
+\end{itemize}
+
+the next logical progression was to combine both approaches into a single defence framework.
+
+The motivation behind this experiment was that:
+\begin{itemize}
+    \item Median/MAD is effective at detecting abnormal update magnitudes,
+    \item while cosine similarity is effective at detecting abnormal optimisation directions.
+\end{itemize}
+
+Therefore, combining both mechanisms was expected to provide:
+\begin{itemize}
+    \item stronger robustness,
+    \item lower false positives,
+    \item and improved poisoning isolation under extreme non-IID conditions.
+\end{itemize}
+
+This file continues using:
+\begin{itemize}
+    \item the MNIST dataset,
+    \item the one-label-per-client extreme non-IID distribution,
+    \item the three-layer MLP architecture,
+    \item and the same SGA poisoning attack from Files 05F--05H.
+\end{itemize}
+
+The model structure remains:
+
+\[
+784 \rightarrow 256 \rightarrow 128 \rightarrow 10
+\]
+
+with the SFL split:
+
+\[
+\text{Client side: } 784 \rightarrow 256
+\]
+
+\[
+\text{Server side: } 256 \rightarrow 128 \rightarrow 10
+\]
+
+\subsubsection*{Why a Combined Defence was Needed}
+
+The results from earlier experiments showed complementary strengths and weaknesses:
+
+\begin{itemize}
+    \item File 05G (Median/MAD) produced strong stability and robust convergence,
+    \item but sometimes failed to detect directionally abnormal updates.
+\end{itemize}
+
+Meanwhile:
+
+\begin{itemize}
+    \item File 05H (historical cosine defence) could identify directional anomalies,
+    \item but was unstable under extreme non-IID distributions,
+    \item and still allowed FL collapse.
+\end{itemize}
+
+Therefore, File 05I combines:
+\begin{enumerate}
+    \item magnitude-based anomaly detection,
+    \item and directional anomaly detection.
+\end{enumerate}
+
+The intuition was:
+
+\begin{quote}
+A poisoned update should usually appear suspicious either in magnitude, direction, or both.
+\end{quote}
+
+\subsubsection*{Median/MAD Component}
+
+As introduced in File 05G, the Median/MAD defence computes robust statistics over client update norms.
+
+For each client update:
+
+\[
+u_k
+\]
+
+the update magnitude is computed:
+
+\[
+s_k = \|u_k\|_2
+\]
+
+The median score:
+
+\[
+m = \mathrm{median}(s_1, s_2, ..., s_K)
+\]
+
+and the Median Absolute Deviation:
+
+\[
+MAD = \mathrm{median}(|s_k - m|)
+\]
+
+are then calculated.
+
+Clients exceeding the threshold:
+
+\[
+s_k > m + \lambda \cdot MAD
+\]
+
+are considered suspicious.
+
+This defence remains highly robust because:
+\begin{itemize}
+    \item the median is insensitive to extreme poisoned updates,
+    \item unlike mean-based aggregation.
+\end{itemize}
+
+\subsubsection*{Historical Cosine Component}
+
+The cosine component from File 05H is also retained.
+
+Each update vector:
+
+\[
+u_k^{(t)}
+\]
+
+is compared against the client's historical EMA reference vector:
+
+\[
+h_k^{(t-1)}
+\]
+
+using cosine similarity:
+
+\[
+\cos(\theta_k)
+=
+\frac{
+u_k^{(t)}
+\cdot
+h_k^{(t-1)}
+}{
+\|u_k^{(t)}\|
+\,
+\|h_k^{(t-1)}\|
+}
+\]
+
+The EMA historical memory is updated using:
+
+\[
+h_k^{(t)}
+=
+\alpha h_k^{(t-1)}
++
+(1-\alpha)u_k^{(t)}
+\]
+
+This allows the defence to:
+\begin{itemize}
+    \item retain long-term optimisation behaviour,
+    \item while still adapting gradually to changing gradients.
+\end{itemize}
+
+\subsubsection*{How Both Defences Were Combined}
+
+Importantly, File 05I is not simply a direct copy-and-paste combination of Files 05G and 05H.
+
+Several implementation changes were required to stabilise the hybrid defence.
+
+The combined logic works as follows:
+
+\begin{enumerate}
+    \item Compute Median/MAD anomaly scores.
+    \item Compute historical cosine similarity scores.
+    \item Independently flag suspicious clients from each defence.
+    \item Merge the flagged-client sets.
+\end{enumerate}
+
+The final flagged set becomes:
+
+\[
+\mathcal{F}
+=
+\mathcal{F}_{MAD}
+\cup
+\mathcal{F}_{cosine}
+\]
+
+Only the remaining clients are aggregated:
+
+\[
+\mathcal{K}_{keep}
+=
+\{1,\dots,K\}
+\setminus
+\mathcal{F}
+\]
+
+This means:
+\begin{itemize}
+    \item a client can be removed if either defence detects suspicious behaviour.
+\end{itemize}
+
+This hybrid filtering substantially improves robustness.
+
+\subsubsection*{How the Defence was Applied Differently in FL and SFL}
+
+The attack affects FL and SFL differently, therefore the defence also operates differently.
+
+\paragraph{FL Defence}
+
+In FL:
+\begin{itemize}
+    \item the SGA attack modifies all model layers simultaneously.
+\end{itemize}
+
+Therefore:
+\begin{itemize}
+    \item Median/MAD is computed on the full flattened model update,
+    \item cosine similarity is also computed on the full update vector.
+\end{itemize}
+
+The FL global aggregation becomes:
+
+\[
+\theta^{t+1}
+=
+\sum_{k \in \mathcal{K}_{keep}}
+\frac{n_k}{n}
+\theta_k^{t+1}
+\]
+
+where poisoned clients are excluded.
+
+\paragraph{SFL Defence}
+
+In SFL:
+\begin{itemize}
+    \item the attack only directly affects the client-side layer.
+\end{itemize}
+
+Therefore:
+\begin{itemize}
+    \item the FL-style defence operates only on the client-side update,
+    \item while server-side aggregation remains separate.
+\end{itemize}
+
+This preserves SFL privacy because:
+\begin{itemize}
+    \item raw data never leaves the client,
+    \item only client-side optimisation updates are analysed.
+\end{itemize}
+
+The server still aggregates server-side parameters independently:
+
+\[
+\theta_s^{t+1}
+=
+\sum_{k=1}^{K}
+\frac{n_k}{n}
+\theta_{s,k}^{t+1}
+\]
+
+Thus:
+\begin{itemize}
+    \item the SFL defence remains split-aware,
+    \item unlike standard FL defences.
+\end{itemize}
+
+\subsubsection*{Why This File is Different from 05G and 05H}
+
+Although File 05I combines concepts from both earlier files, it is not merely their direct union.
+
+The major differences include:
+
+\begin{enumerate}
+    \item joint decision logic between MAD and cosine signals,
+    \item unified client filtering,
+    \item stabilised EMA updates,
+    \item improved warm-up handling,
+    \item and revised threshold behaviour.
+\end{enumerate}
+
+Additionally:
+\begin{itemize}
+    \item the cosine defence no longer acts independently,
+    \item but instead acts as a secondary verification signal.
+\end{itemize}
+
+This substantially reduces:
+\begin{itemize}
+    \item false positives,
+    \item and instability seen in File 05H.
+\end{itemize}
+
+\subsubsection*{Results and Interpretation}
+
+The combined defence performs substantially better than the standalone cosine defence.
+
+Unlike File 05H:
+\begin{itemize}
+    \item the FL system no longer catastrophically collapses,
+    \item and both FL and SFL remain stable throughout training.
+\end{itemize}
+
+The final accuracies converge near:
+
+\[
+0.62 - 0.65
+\]
+
+for both systems.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/05I_accuracy.png}
+    \caption{FL and reconstructed SFL accuracy under the combined Median/MAD and historical cosine defence. Both systems remain stable and converge successfully.}
+\end{figure}
+
+Compared to:
+\begin{itemize}
+    \item File 05F (no defence),
+    \item and File 05H (cosine-only defence),
+\end{itemize}
+
+the hybrid defence:
+\begin{itemize}
+    \item produces dramatically improved robustness,
+    \item significantly reduces FL collapse,
+    \item and maintains strong SFL convergence.
+\end{itemize}
+
+The loss curves also remain substantially more stable:
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/05I_loss.png}
+    \caption{FL and reconstructed SFL loss under the combined defence. Unlike previous cosine-only experiments, both systems remain numerically stable.}
+\end{figure}
+
+Unlike File 05H:
+\begin{itemize}
+    \item no catastrophic FL divergence occurs,
+    \item and the combined defence successfully prevents exploding optimisation.
+\end{itemize}
+
+\subsubsection*{Accuracy Graph Analysis and Comparison with Previous Defences}
+
+The accuracy curves in File 05I demonstrate that the combined defence produces substantially more stable optimisation behaviour than the standalone cosine defence from File 05H, while also maintaining comparable robustness to the Median/MAD defence from File 05G.
+
+Compared to File 05H:
+\begin{itemize}
+    \item the FL model no longer collapses toward random guessing,
+    \item the catastrophic divergence previously observed in FL is eliminated,
+    \item and both FL and SFL remain within a stable convergence region throughout training.
+\end{itemize}
+
+In File 05H, the cosine-only defence was unable to sufficiently isolate poisoned FL updates. As a result:
+\begin{itemize}
+    \item FL accuracy collapsed toward approximately \(0.10\),
+    \item while FL loss exploded toward values above \(70\).
+\end{itemize}
+
+In contrast, File 05I maintains:
+\begin{itemize}
+    \item FL accuracy near \(0.62 - 0.65\),
+    \item and SFL accuracy near \(0.62 - 0.64\),
+\end{itemize}
+
+indicating that the combined defence successfully stabilised both systems.
+
+The SFL accuracy curve in File 05I also shows reduced oscillation compared to File 05H. Although some fluctuations remain due to:
+\begin{itemize}
+    \item the extreme non-IID setting,
+    \item and the aggressive poisoning attack,
+\end{itemize}
+
+the optimisation trajectory is substantially smoother than the cosine-only experiment.
+
+Compared to File 05G (Median/MAD only):
+\begin{itemize}
+    \item the final accuracies are relatively similar,
+    \item however the combined defence provides additional directional anomaly filtering,
+    \item which improves robustness against poisoned updates that may have normal magnitude but abnormal optimisation direction.
+\end{itemize}
+
+The combined defence therefore acts as:
+\begin{itemize}
+    \item a stronger general-purpose defence than cosine-only methods,
+    \item while also providing more comprehensive anomaly detection than Median/MAD alone.
+\end{itemize}
+
+Overall, the graphs demonstrate that:
+\begin{enumerate}
+    \item Median/MAD provides strong statistical stability,
+    \item cosine similarity provides directional anomaly awareness,
+    \item and combining both mechanisms produces the most balanced behaviour observed so far in the project.
+\end{enumerate}
+
+\subsubsection*{Key Conclusion}
+
+File 05I demonstrated that:
+\begin{itemize}
+    \item combining robust statistical filtering with directional historical analysis is substantially more effective than using either mechanism independently.
+\end{itemize}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/combined_defence.png}
+    \caption{Combined Median/MAD and historical cosine defence workflow.}
+    \label{fig:combined_defence}
+\end{figure}
+The experiment also showed that:
+\begin{itemize}
+    \item split-aware poisoning defence for SFL requires fundamentally different treatment from traditional FL,
+    \item because the attack surface itself is structurally different.
+\end{itemize}
+
+Most importantly:
+\begin{itemize}
+    \item the hybrid defence preserved SFL privacy constraints,
+    \item while still providing strong poisoning robustness under extreme non-IID conditions.
+\end{itemize}

@@ -1,0 +1,430 @@
+\subsection*{File 05G: Median/MAD Defence against SGA Poisoning in FL and SFL}
+
+File 05G introduces the first defence mechanism against the poisoning attacks introduced in File 05F. The objective of this experiment was to investigate whether a lightweight robust aggregation defence could stabilise both Federated Learning (FL) and Split Federated Learning (SFL) under the same Scale Gradient Attack (SGA) conditions.
+
+The experiment continues using:
+\begin{itemize}
+    \item the MNIST dataset,
+    \item the extreme one-label-per-client non-IID configuration,
+    \item the three-layer MLP architecture,
+    \item and the same SGA poisoning attack from File 05F.
+\end{itemize}
+
+The model architecture remains:
+
+\[
+784 \rightarrow 256 \rightarrow 128 \rightarrow 10
+\]
+
+with the SFL split defined as:
+
+\[
+\text{Client side: } 784 \rightarrow 256
+\]
+
+\[
+\text{Server side: } 256 \rightarrow 128 \rightarrow 10
+\]
+
+The major change introduced in this notebook is the addition of a Median/MAD-based robust defence mechanism.
+
+\subsubsection*{Why Median was Selected Instead of Mean}
+
+Traditional Federated Averaging uses the arithmetic mean:
+
+\[
+\theta^{t+1}
+=
+\frac{1}{K}
+\sum_{k=1}^{K}
+\theta_k^{t+1}
+\]
+
+However, the arithmetic mean is highly sensitive to outliers. A single malicious client producing extremely large poisoned updates can dominate the aggregation process.
+
+The median operator was selected because it is substantially more robust against outliers. Instead of averaging updates directly, the defence computes the coordinate-wise median across client updates:
+
+\[
+m_j
+=
+\text{median}
+\left(
+u_{1,j},
+u_{2,j},
+\dots,
+u_{K,j}
+\right)
+\]
+
+where:
+\begin{itemize}
+    \item $u_{k,j}$ is parameter coordinate $j$ from client $k$.
+\end{itemize}
+
+The defence then measures how far each client deviates from the median update.
+
+This approach was selected because:
+\begin{itemize}
+    \item the project uses only 10 clients,
+    \item and many advanced FL defences such as Krum, Multi-Krum, or Bulyan perform poorly or become unstable under small client counts.
+\end{itemize}
+
+Many established FL defence algorithms assume:
+\begin{itemize}
+    \item large numbers of clients,
+    \item or large proportions of honest participants.
+\end{itemize}
+
+Under extreme non-IID distributions with only 10 clients:
+\begin{itemize}
+    \item naturally different client updates already appear highly anomalous,
+    \item making neighbour-based FL defences unreliable.
+\end{itemize}
+
+Median/MAD was therefore selected because it:
+\begin{itemize}
+    \item is lightweight,
+    \item robust to extreme values,
+    \item computationally simple,
+    \item and does not require pairwise client-distance calculations.
+\end{itemize}
+
+\subsubsection*{MAD-Based Anomaly Detection}
+
+The defence uses the Median Absolute Deviation (MAD) statistic to identify suspicious updates.
+
+First, the coordinate-wise median update is computed:
+
+\[
+m
+=
+\text{median}(u_1, u_2, \dots, u_K)
+\]
+
+Then the deviation of each client from the median is calculated:
+
+\[
+d_k
+=
+\|u_k - m\|
+\]
+
+The MAD statistic is then:
+
+\[
+MAD
+=
+\text{median}
+\left(
+|d_k - \text{median}(d)|
+\right)
+\]
+
+Each client receives a robust anomaly score:
+
+\[
+z_k
+=
+\frac{|d_k - \text{median}(d)|}{MAD + \epsilon}
+\]
+
+A client is flagged if:
+
+\[
+z_k > \tau
+\]
+
+where:
+\begin{itemize}
+    \item $\tau$ is the MAD threshold coefficient.
+\end{itemize}
+
+In this notebook:
+
+\[
+\tau = 6
+\]
+
+The value was selected experimentally through repeated trial-and-error testing. Smaller thresholds caused:
+\begin{itemize}
+    \item honest clients to be removed excessively under extreme non-IID conditions.
+\end{itemize}
+
+Larger thresholds:
+\begin{itemize}
+    \item failed to suppress the poisoning sufficiently.
+\end{itemize}
+
+The selected value therefore represented a practical balance between:
+\begin{itemize}
+    \item robustness,
+    \item and preservation of legitimate client diversity.
+\end{itemize}
+
+\subsubsection*{How Defence Works in FL}
+
+In FL, the malicious client poisons all three layers of the model.
+
+Therefore, the FL defence evaluates:
+\begin{itemize}
+    \item the full model update vector,
+    \item across all layers simultaneously.
+\end{itemize}
+
+The malicious client update is completely excluded from aggregation if flagged:
+
+\[
+\mathcal{K}_{keep}
+=
+\{
+k \mid z_k \leq \tau
+\}
+\]
+
+The robust FL aggregation becomes:
+
+\[
+\theta^{t+1}
+=
+\frac{1}{|\mathcal{K}_{keep}|}
+\sum_{k \in \mathcal{K}_{keep}}
+\theta_k^{t+1}
+\]
+
+Thus, flagged FL clients contribute nothing to the next global model.
+
+\subsubsection*{How Defence Works in SFL}
+
+The SFL defence behaves differently because the attack only affects:
+\begin{itemize}
+    \item the client-side layer.
+\end{itemize}
+
+The server-side layers are not directly poisoned by the malicious client.
+
+The SFL defence therefore evaluates:
+\begin{itemize}
+    \item server-observable gradients,
+    \item client-side parameter updates,
+    \item and server-side optimisation behaviour.
+\end{itemize}
+
+Importantly:
+\begin{itemize}
+    \item the SFL server never directly accesses client raw data,
+    \item preserving privacy.
+\end{itemize}
+
+Instead, the server analyses:
+\begin{itemize}
+    \item activations,
+    \item gradients,
+    \item and update statistics.
+\end{itemize}
+
+This allows anomaly detection without reconstructing private client datasets.
+
+The SFL client-side FL aggregation still occurs separately:
+
+\[
+\theta_c^{t+1}
+=
+\sum_{k=1}^{K}
+\frac{n_k}{n}
+\theta_{c,k}^{t+1}
+\]
+
+while server-side parameters are aggregated independently:
+
+\[
+\theta_s^{t+1}
+=
+\sum_{k=1}^{K}
+\frac{n_k}{n}
+\theta_{s,k}^{t+1}
+\]
+
+The reconstructed SFL model is then formed from both aggregated components.
+
+\subsubsection*{Flagged Client Diagnostics}
+
+The notebook records:
+\[
+\texttt{FL flagged clients}
+\]
+
+and
+
+\[
+\texttt{SFL flagged clients}
+\]
+
+These diagnostics indicate which clients were classified as anomalous during each communication round.
+
+This became extremely useful during debugging and hyperparameter tuning because:
+\begin{itemize}
+    \item false positives could be identified,
+    \item aggressive thresholds could be detected,
+    \item and defence instability could be analysed across rounds.
+\end{itemize}
+
+The logs also allowed identification of:
+\begin{itemize}
+    \item rounds where the malicious client escaped detection,
+    \item or rounds where too many honest clients were removed.
+\end{itemize}
+
+\subsubsection*{Maximum Absolute Weight Monitoring}
+
+The experiment also records:
+
+\[
+\texttt{SFL max abs weight}
+\]
+
+and corresponding FL maximum absolute weights.
+
+This metric monitors:
+
+\[
+\max_i |\theta_i|
+\]
+
+across all model parameters.
+
+This diagnostic was important because poisoning attacks often create:
+\begin{itemize}
+    \item exploding parameter values,
+    \item numerical instability,
+    \item NaNs,
+    \item or optimisation divergence.
+\end{itemize}
+
+Monitoring maximum absolute weights helped identify:
+\begin{itemize}
+    \item early instability,
+    \item exploding gradients,
+    \item and ineffective defence thresholds.
+\end{itemize}
+
+\subsubsection*{FL Minus SFL Accuracy}
+
+The metric:
+
+\[
+A_{diff}
+=
+A_{FL}
+-
+A_{SFL}
+\]
+
+was retained to compare robustness between systems.
+
+Negative values indicate:
+\begin{itemize}
+    \item SFL outperforming FL.
+\end{itemize}
+
+Positive values indicate:
+\begin{itemize}
+    \item FL outperforming SFL.
+\end{itemize}
+
+This became useful for analysing:
+\begin{itemize}
+    \item whether the defence stabilised one system more effectively than the other.
+\end{itemize}
+
+\subsubsection*{Role of the Global L2 Distance}
+
+The global L2 distance was retained from earlier experiments:
+
+\[
+L_2
+=
+\left\|
+\theta_{FL}
+-
+\theta_{SFL}
+\right\|_2
+\]
+
+Although FL and SFL are no longer expected to remain equivalent under attack conditions, the L2 metric still provides useful information:
+\begin{itemize}
+    \item small L2 growth suggests similar optimisation trajectories,
+    \item while large L2 divergence indicates fundamentally different optimisation behaviour.
+\end{itemize}
+
+Under the defence setting:
+\begin{itemize}
+    \item the L2 distance no longer represents equivalence validation,
+    \item but instead measures behavioural divergence between defended FL and defended SFL systems.
+\end{itemize}
+
+\subsubsection*{Results and Interpretation}
+
+Figure~\ref{fig:05g_accuracy} shows a major improvement compared to the undefended attack experiment in File 05F.
+
+The FL model no longer collapses catastrophically. Instead:
+\begin{itemize}
+    \item both FL and SFL continue stable learning,
+    \item and both systems reach accuracies above 0.60.
+\end{itemize}
+
+Interestingly:
+\begin{itemize}
+    \item SFL often slightly outperforms FL during many communication rounds.
+\end{itemize}
+
+This suggests that:
+\begin{itemize}
+    \item the isolated attack surface in SFL,
+    \item combined with robust aggregation,
+\end{itemize}
+
+creates a naturally stabilised optimisation process.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/05G_accuracy.png}
+    \caption{FL vs reconstructed SFL global test accuracy using the Median/MAD defence under SGA poisoning attacks. Both systems remain stable and avoid catastrophic collapse.}
+    \label{fig:05g_accuracy}
+\end{figure}
+
+Figure~\ref{fig:05g_loss} shows that:
+\begin{itemize}
+    \item the FL loss remains unstable and oscillatory,
+    \item while the SFL loss remains comparatively smoother.
+\end{itemize}
+
+This behaviour indicates that:
+\begin{itemize}
+    \item although the defence successfully prevents collapse,
+    \item FL still experiences stronger optimisation disruption because the attacker poisons the full model.
+\end{itemize}
+
+SFL remains more stable because:
+\begin{itemize}
+    \item only the client-side layer is attacked,
+    \item while the server-side optimisation remains comparatively protected.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/05G_loss.png}
+    \caption{FL vs reconstructed SFL global test loss using the Median/MAD defence. FL remains noisier and less stable, while SFL maintains smoother optimisation behaviour.}
+    \label{fig:05g_loss}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.4\linewidth]{figures/median_mad_defence.png}
+    \caption{Median/MAD poisoning defence workflow.}
+    \label{fig:median_mad}
+\end{figure}
+Overall, File 05G demonstrates that:
+\begin{itemize}
+    \item lightweight robust aggregation can significantly stabilise both FL and SFL under poisoning attacks,
+    \item SFL naturally limits the attack surface,
+    \item and Median/MAD defence mechanisms are particularly suitable for small-client extreme non-IID environments.
+\end{itemize}

@@ -1,0 +1,29 @@
+\subsection*{File 01: Federated Learning Baseline on MNIST (IID vs Extreme Non-IID)}
+
+This notebook establishes the first Federated Learning (FL) baseline experiment of the project using the MNIST handwritten digit dataset. The primary objective of this file is to understand how a standard FL system behaves under both ideal IID conditions and extreme non-IID label-skew conditions before introducing Split Federated Learning (SFL), deeper architectures, poisoning attacks, or defence mechanisms. The file focuses entirely on standard FL behaviour and provides the foundational reference point for all subsequent experiments in the project.
+
+The implemented model is a shallow fully connected neural network (TwoNN-style architecture). The network consists of an input flattening stage followed by a hidden fully connected layer with ReLU activation and a final output layer containing 10 output classes corresponding to the MNIST digits. The FL system uses standard Federated Averaging (FedAvg) aggregation, where clients train locally using SGD optimisation before transmitting updated model weights to the server for global aggregation. The experiments use 10 distributed clients and 100 communication rounds.
+
+Two separate training scenarios were investigated. In Stage 1, the training data was distributed using an IID partitioning strategy, where each client receives a balanced random subset of the dataset. In Stage 2, an extreme non-IID configuration was implemented where each client receives data from only a single label class (one-label-per-client). This creates severe client heterogeneity and simulates one of the most difficult distributed learning environments for FL optimisation.
+
+The IID experiment demonstrated stable and efficient convergence, reaching approximately 0.97 test accuracy after 100 communication rounds. In contrast, the extreme non-IID experiment converged much more slowly and stabilised around approximately 0.84--0.85 accuracy. Although the one-label-per-client setting significantly reduced convergence speed and final performance, the FL system still successfully learned a reasonably accurate global classifier despite each client only observing a single digit class locally.
+
+Several important observations were obtained from this experiment. First, standard FL remains surprisingly robust under severe label-skew heterogeneity when applied to relatively simple datasets such as MNIST. Second, extreme non-IID conditions introduce substantial optimisation difficulty and slower global convergence due to client drift and conflicting local objectives. Third, the experiment established a strong baseline reference for future comparison with Split Federated Learning architectures, deeper models, poisoning attacks, and robust defence mechanisms explored later in the project.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/stage1_iid_fl_mnist.png}
+    \caption{Stage 1: IID Federated Learning performance on MNIST.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/stage2_extreme_noniid_fl_mnist.png}
+    \caption{Stage 2: Extreme non-IID Federated Learning performance using one-label-per-client partitioning.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/iid_vs_extreme_noniid_mnist.png}
+    \caption{Comparison between IID and extreme non-IID FL performance on MNIST.}
+\end{figure}

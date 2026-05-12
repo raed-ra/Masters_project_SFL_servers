@@ -1,0 +1,59 @@
+\subsection*{File 04: Federated Learning vs Split Learning Equivalence Study (3 Clients, MNIST)}
+
+This notebook investigates the mathematical equivalence between Federated Learning (FL) and Split Federated Learning (SFL) under controlled deterministic conditions using the MNIST dataset. The purpose of this file is to validate that the implemented SFL framework behaves identically to standard FL when both systems are initialised with identical weights, use identical client datasets, and process data in the exact same order. This experiment forms a critical validation stage in the project because it establishes confidence that any future divergence between FL and SFL is caused by architectural behaviour, attacks, or defence mechanisms rather than implementation inconsistencies.
+
+The experiment uses three distributed clients and a shallow fully connected neural network architecture trained over 50 communication rounds. In the standard FL implementation, each client trains a complete local model and transmits updated model parameters to the server where Federated Averaging (FedAvg) aggregation is performed. In the SFL implementation, the model is partitioned into client-side and server-side components. The client computes the forward pass through the client-side layers and transmits activations to the server, which completes the forward and backward propagation process before returning gradients to the client. Separate aggregation is then performed for the client-side and server-side model partitions before reconstructing a complete global SFL model.
+
+A major feature of this notebook is the strict enforcement of deterministic training conditions. Random seeds, initial model parameters, client dataset allocation, mini-batch ordering, optimiser behaviour, and aggregation ordering are all synchronised between FL and SFL. This ensures that both systems receive mathematically identical optimisation conditions throughout training.
+
+The FL and reconstructed SFL global models are evaluated independently after every communication round using the MNIST test dataset. Test accuracy and test loss are computed using the same evaluation pipeline for both systems. The reconstructed SFL model is formed by combining the aggregated client-side layers and aggregated server-side layers into a single equivalent network representation for direct comparison against the FL global model.
+
+The notebook also computes the global L2 distance between the FL global model parameters and reconstructed SFL global model parameters. The L2 distance is calculated using:
+
+\[
+L_2 = \left\| \theta_{FL} - \theta_{SFL} \right\|_2
+\]
+
+where:
+
+\[
+\theta_{FL}
+\]
+
+represents the FL global model parameters and
+
+\[
+\theta_{SFL}
+\]
+
+represents the reconstructed SFL global model parameters. All model parameters are flattened into vectors before computing the Euclidean norm. If both systems remain mathematically equivalent throughout optimisation, the L2 distance should remain exactly zero.
+
+The results demonstrate complete equivalence between FL and SFL under controlled conditions. The global accuracy curves overlap perfectly throughout all 50 communication rounds, converging to approximately 0.96--0.97 test accuracy. Similarly, the global test loss curves are numerically identical across all rounds and decrease steadily from approximately 2.3 to near 0.12. Most importantly, the global L2 distance remains exactly zero throughout the entire experiment, confirming that the reconstructed SFL global model is mathematically identical to the FL global model at every communication round.
+
+The notebook additionally records timing information for both FL and SFL training. Separate timing measurements are maintained for FL client training, SFL client/server processing, aggregation, and evaluation overhead. These timing metrics establish a baseline computational comparison that becomes important in later poisoning attack and defence experiments where additional anomaly detection logic introduces extra computational cost.
+
+This file establishes one of the most important foundations of the project. By proving exact equivalence between FL and SFL under deterministic conditions, it validates the correctness of the SFL implementation and ensures that future behavioural differences observed under non-IID distributions, poisoning attacks, or defence mechanisms are genuine architectural effects rather than numerical inconsistencies or implementation errors.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/fl_vs_sfl_l2_distance.png}
+    \caption{Global L2 distance between the FL global model and reconstructed SFL global model. The L2 distance remains exactly zero throughout all communication rounds, demonstrating mathematical equivalence.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/fl_vs_sfl_accuracy.png}
+    \caption{Comparison of FL and reconstructed SFL global test accuracy over 50 communication rounds. Both systems produce identical convergence behaviour.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/fl_vs_sfl_loss.png}
+    \caption{Comparison of FL and reconstructed SFL global test loss over 50 communication rounds. Both systems produce identical optimisation trajectories.}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figures/fl_sfl_equivalence.png}
+    \caption{Controlled FL vs SFL equivalence experiment setup.}
+    \label{fig:fl_sfl_equivalence}
+\end{figure}

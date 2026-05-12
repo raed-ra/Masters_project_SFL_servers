@@ -1,0 +1,25 @@
+\subsection*{File 02: Federated Learning Baseline Across MNIST, Fashion-MNIST, and CIFAR-10}
+
+This notebook establishes the initial Federated Learning (FL) baseline for the project. The objective of this file is to investigate how standard FL behaves under both IID and highly non-IID client data distributions before introducing Split Federated Learning (SFL), poisoning attacks, or defence mechanisms. The experiments were conducted on three datasets with increasing complexity: MNIST, Fashion-MNIST (FMNIST), and CIFAR-10. A shallow TwoNN fully connected neural network was used as the baseline model. The architecture consisted of an input flattening layer, a single hidden fully connected layer with 200 neurons and ReLU activation, and a final output layer containing 10 output classes. The model was intentionally kept shallow in order to first understand the effect of data heterogeneity without the added complexity of deeper architectures.
+
+The FL implementation used 10 distributed clients and standard Federated Averaging (FedAvg) aggregation. Each communication round consisted of clients performing local SGD optimisation on their own local datasets before transmitting their updated model weights to the server for aggregation. Multiple data partitioning strategies were evaluated. In the IID configuration, the training data was randomly and evenly distributed across all clients. In the non-IID configurations, each client was restricted to only a subset of labels, specifically 1, 2, 4, or 6 labels per client. This produced increasingly severe label-skew heterogeneity and simulated realistic distributed learning environments where clients may observe only highly specialised local data.
+
+The experiments demonstrated that non-IID data significantly affects FL convergence and final model performance, although the severity of the degradation depends strongly on dataset complexity. MNIST produced the strongest results, with IID training converging close to 0.98 accuracy and the extreme 1-label-per-client setting still achieving approximately 0.80 accuracy after 100 communication rounds. Fashion-MNIST was more difficult, with IID performance converging near 0.89 accuracy and the 1-label-per-client setting converging around 0.70--0.72 accuracy. CIFAR-10 proved substantially more challenging for the shallow fully connected TwoNN architecture. IID accuracy reached only approximately 0.50, while the 1-label-per-client setting converged around 0.30 accuracy. The 2-label-per-client CIFAR-10 configuration also remained highly unstable and close to random classification performance for much of the training process.
+
+The results of this file produced several important observations. First, shallow neural network architectures appear surprisingly robust under extreme non-IID conditions on simpler datasets such as MNIST. Second, increasing dataset complexity significantly amplifies the optimisation difficulty introduced by client heterogeneity. Third, assigning additional labels per client consistently improves convergence stability and final global accuracy. These findings established the baseline behaviour of standard FL under severe non-IID conditions and motivated the next stage of the project, which focused on validating Split Learning equivalence and exploring how architectural partitioning affects convergence, poisoning robustness, and defence behaviour.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/mnist_iid_vs_noniid_accuracy.png}
+    \caption{MNIST IID vs Non-IID FL performance using the TwoNN architecture.}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/fmnist_iid_vs_noniid_accuracy.png}
+    \caption{Fashion-MNIST IID vs Non-IID FL performance using the TwoNN architecture.}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/cifar10_iid_vs_noniid_accuracy.png}
+    \caption{CIFAR-10 IID vs Non-IID FL performance using the TwoNN architecture.}
+\end{figure}
