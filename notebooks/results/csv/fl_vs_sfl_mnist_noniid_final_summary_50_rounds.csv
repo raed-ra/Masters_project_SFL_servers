@@ -1,5 +1,0 @@
-labels_per_client,round,optimizer,fl_test_accuracy,sfl_test_accuracy,fl_test_loss,sfl_test_loss,fl_minus_sfl_accuracy,global_l2_distance_fl_vs_sfl,weights_dir
-1,50,SGD,0.1144,0.1144,2.2952989917755127,2.2952989917755127,0.0,0.0,results/weights/fl_vs_sfl_noniid_label_skew/labels_1_per_client
-2,50,SGD,0.4249,0.4249,1.7448504125595092,1.7448504125595092,0.0,0.0,results/weights/fl_vs_sfl_noniid_label_skew/labels_2_per_client
-4,50,SGD,0.64,0.64,1.1531037534713746,1.1531037534713746,0.0,0.0,results/weights/fl_vs_sfl_noniid_label_skew/labels_4_per_client
-6,50,SGD,0.5789,0.5789,1.3552482919692994,1.3552482919692994,0.0,0.0,results/weights/fl_vs_sfl_noniid_label_skew/labels_6_per_client

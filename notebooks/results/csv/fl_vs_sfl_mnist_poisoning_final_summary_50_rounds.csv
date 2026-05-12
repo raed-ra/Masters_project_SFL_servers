@@ -1,9 +1,0 @@
-scenario,attack_enabled,labels_per_client,round,optimizer,fl_test_accuracy,sfl_test_accuracy,fl_test_loss,sfl_test_loss,fl_minus_sfl_accuracy,global_l2_distance_fl_vs_sfl,weights_dir
-attack_client_0_scale_minus_5p0,True,1,50,SGD,0.098,0.098,,,0.0,,results/weights/fl_vs_sfl_noniid_poisoning_attack/labels_1_per_client/attack_client_0_scale_minus_5p0
-attack_client_0_scale_minus_5p0,True,2,50,SGD,0.098,0.098,,,0.0,,results/weights/fl_vs_sfl_noniid_poisoning_attack/labels_2_per_client/attack_client_0_scale_minus_5p0
-attack_client_0_scale_minus_5p0,True,4,50,SGD,0.1024,0.1024,297.40852958984374,297.40852958984374,0.0,0.0,results/weights/fl_vs_sfl_noniid_poisoning_attack/labels_4_per_client/attack_client_0_scale_minus_5p0
-attack_client_0_scale_minus_5p0,True,6,50,SGD,0.1753,0.1753,3.0025714202880858,3.0025714202880858,0.0,0.0,results/weights/fl_vs_sfl_noniid_poisoning_attack/labels_6_per_client/attack_client_0_scale_minus_5p0
-baseline_no_attack,False,1,50,SGD,0.1144,0.1144,2.2952989917755127,2.2952989917755127,0.0,0.0,results/weights/fl_vs_sfl_noniid_poisoning_attack/labels_1_per_client/baseline_no_attack
-baseline_no_attack,False,2,50,SGD,0.4249,0.4249,1.7448504125595092,1.7448504125595092,0.0,0.0,results/weights/fl_vs_sfl_noniid_poisoning_attack/labels_2_per_client/baseline_no_attack
-baseline_no_attack,False,4,50,SGD,0.64,0.64,1.1531037534713746,1.1531037534713746,0.0,0.0,results/weights/fl_vs_sfl_noniid_poisoning_attack/labels_4_per_client/baseline_no_attack
-baseline_no_attack,False,6,50,SGD,0.5789,0.5789,1.3552482919692994,1.3552482919692994,0.0,0.0,results/weights/fl_vs_sfl_noniid_poisoning_attack/labels_6_per_client/baseline_no_attack
